@@ -1,6 +1,6 @@
 all:
-	go build GNU_sort.go
-	./GNU_sort GNU_sort.go
+	go build
+	./main main.go
 
 clean:
-	rm GNU_sort
+	rm main
