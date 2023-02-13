@@ -6,8 +6,8 @@ Color_Off='\033[0m'
 
 #not a file
 LC_ALL=C  sort a &> real.out
-./main a > my.out 
-diff real.out my.out > diff.out
+./main a > test.out
+diff real.out test.out > diff.out
 
 if [`cat diff.out` -eq ""]; then
     printf "${GREEN} PASSED ${Color_Off}\n"
@@ -18,14 +18,14 @@ fi
 
 #directory
 LC_ALL=C  sort . &> real.out
-./main . > my.out 
-diff real.out my.out > diff.out
+./main . > test.out
+diff real.out test.out > diff.out
 
 if [`cat diff.out` -eq ""]; then
     printf "${GREEN} PASSED ${Color_Off}\n"
+    rm test.out real.out diff.out
 else
     cat diff.out
     printf "${RED} FAILED ${Color_Off}\n"
 fi
 
-rm my.out real.out diff.out

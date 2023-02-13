@@ -11,14 +11,14 @@ Color_Off='\033[0m'
 #native byte values.
 
 LC_ALL=C sort Makefile &> real.out
-./main Makefile > my.out
-diff real.out my.out > diff.out
+./main Makefile > test.out
+diff real.out test.out > diff.out
 
 if [`cat diff.out` -eq ""]; then
     printf "${GREEN} PASSED ${Color_Off}\n"
+    rm test.out real.out diff.out
 else
     cat diff.out
     printf "${RED} FAILED ${Color_Off}\n"
 fi
 
-rm my.out real.out diff.out
