@@ -22,13 +22,13 @@ func isFile(filename string) {
 	}
 }
 
-func readLineByLine(scanner *bufio.Scanner) []string {
+func readLineByLine(scanner *bufio.Scanner, returnChannel chan []string) {
 	var lines []string
 	for scanner.Scan() {
 		line := scanner.Text()
 		lines = append(lines, line)
 	}
-	return lines
+	returnChannel <- lines
 }
 
 func SortingAlgorithm(lines *[]string) {
@@ -53,9 +53,12 @@ func ScanLines() []string {
 	var lines []string
 	arg := argumentParsing()
 	var scanner *bufio.Scanner
+	// using 1 channel for each file
+	channel := make(chan []string, len(arg)-1)
 	if READ_STDIN {
 		scanner = bufio.NewScanner(os.Stdin)
-		lines = append(lines, readLineByLine(scanner)...)
+		go readLineByLine(scanner, channel)
+
 	} else {
 		for i := 1; i < len(arg); i++ {
 			isFile(arg[i])
@@ -65,9 +68,12 @@ func ScanLines() []string {
 				os.Exit(2)
 			}
 			scanner = bufio.NewScanner(readFile)
-			lines = append(lines, readLineByLine(scanner)...)
-			_ = readFile.Close()
+			defer readFile.Close()
+			go readLineByLine(scanner, channel)
 		}
+	}
+	for i := 0; i < len(arg)-1; i++ {
+		lines = append(lines, <-channel...)
 	}
 
 	return lines
