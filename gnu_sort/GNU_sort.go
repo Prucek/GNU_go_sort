@@ -2,6 +2,7 @@ package gnu_sort
 
 import (
 	"bufio"
+	"flag"
 	"fmt"
 	"os"
 	"sort"
@@ -9,6 +10,7 @@ import (
 )
 
 var READ_STDIN = false // else reading from files
+var reverseFlag = false
 
 func isFile(filename string) {
 	info, err := os.Stat(filename)
@@ -35,15 +37,26 @@ func SortingAlgorithm(lines *[]string) {
 	sort.Slice(*lines, func(i, j int) bool {
 		s1, s2 := (*lines)[i], (*lines)[j]
 		result := strings.Compare(s1, s2)
+		if reverseFlag {
+			return result != -1
+		}
 		return result != 1
 	})
 }
 
+func optionFlags() {
+	flag.BoolVar(&reverseFlag, "reverse", false, "reverse the result of comparisons")
+	flag.BoolVar(&reverseFlag, "r", false, "reverse the result of comparisons")
+	flag.Parse()
+}
+
 func argumentParsing() []string {
-	arg := os.Args
-	if len(arg) == 1 {
+	optionFlags()
+	arg := flag.Args()
+
+	if len(arg) == 0 {
 		READ_STDIN = true
-	} else if len(arg) > 1 {
+	} else if len(arg) > 0 {
 		READ_STDIN = false
 	}
 	return arg
@@ -51,18 +64,20 @@ func argumentParsing() []string {
 
 func ScanLines() []string {
 	var lines []string
-	arg := argumentParsing()
+	files := argumentParsing()
 	var scanner *bufio.Scanner
 	// using 1 channel for each file
-	channel := make(chan []string, len(arg)-1)
+	var channel chan []string
 	if READ_STDIN {
+		channel = make(chan []string, 1)
 		scanner = bufio.NewScanner(os.Stdin)
 		go readLineByLine(scanner, channel)
 
 	} else {
-		for i := 1; i < len(arg); i++ {
-			isFile(arg[i])
-			readFile, err := os.Open(arg[i])
+		channel = make(chan []string, len(files))
+		for i := 0; i < len(files); i++ {
+			isFile(files[i])
+			readFile, err := os.Open(files[i])
 			if err != nil {
 				fmt.Println(err)
 				os.Exit(2)
@@ -72,7 +87,7 @@ func ScanLines() []string {
 			go readLineByLine(scanner, channel)
 		}
 	}
-	for i := 0; i < len(arg)-1; i++ {
+	for i := 0; i < len(files); i++ {
 		lines = append(lines, <-channel...)
 	}
 

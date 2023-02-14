@@ -12,5 +12,6 @@ tests:
 	./test/test_diff_2.sh
 	./test/test_diff_3.sh
 	./test/test_multiple.sh
+	./test/test_reverse.sh
 	cd gnu_sort && go test
 	rm main
