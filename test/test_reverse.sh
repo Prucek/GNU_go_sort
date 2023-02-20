@@ -1,7 +1,4 @@
 #!/usr/bin/env sh
-set -o errexit
-set -o nounset
-set -o pipefail
 
 # FROM SORT DOCUMENTATION
 #*** WARNING ***
@@ -9,6 +6,7 @@ set -o pipefail
 #Set LC_ALL=C to get the traditional sort order that uses
 #native byte values.
 
-LC_ALL=C sort Makefile &> real.out
-./sort Makefile > test.out
+LC_ALL=C sort -r cmd/sort/main.go &> real.out
+./sort -r cmd/sort/main.go > test.out
+diff real.out test.out > diff.out
 ./test/test.sh
