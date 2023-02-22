@@ -1,7 +1,6 @@
 package sort
 
 import (
-	"github.com/Prucek/GNU_go_sort/internal/parse"
 	"reflect"
 	"testing"
 )
@@ -26,8 +25,7 @@ func TestSort(t *testing.T) {
 	}
 
 	for _, test := range sortTests {
-		ops := parse.Options{}
-		if SortingAlgorithm(&test.input, &ops); !reflect.DeepEqual(test.input, test.expected) {
+		if SortingAlgorithm(&test.input); !reflect.DeepEqual(test.input, test.expected) {
 			t.Errorf("Output %q not equal to expected %q", test.input, test.expected)
 		}
 	}

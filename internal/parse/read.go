@@ -7,24 +7,25 @@ import (
 )
 
 var READ_STDIN = false // else reading from Files
+type Append func(lines []string, line ...string) []string
 
-func readLineByLine(scanner *bufio.Scanner, returnChannel chan<- []string) {
+func readLineByLine(scanner *bufio.Scanner, returnChannel chan<- []string, fn Append) {
 	var lines []string
 	for scanner.Scan() {
 		line := scanner.Text()
-		lines = append(lines, line)
+		lines = fn(lines, line)
 	}
 	returnChannel <- lines
 }
 
-func ScanLines(arg *Options) (lines []string, err error) {
+func ScanLines(arg *Options, fn Append) (lines []string, err error) {
 	var scanner *bufio.Scanner
 	// using 1 channel for each file
 	var channel chan []string
 	if READ_STDIN {
 		channel = make(chan []string, 1)
 		scanner = bufio.NewScanner(os.Stdin)
-		go readLineByLine(scanner, channel)
+		go readLineByLine(scanner, channel, fn)
 
 	} else {
 		channel = make(chan []string, len(arg.Files))
@@ -40,12 +41,13 @@ func ScanLines(arg *Options) (lines []string, err error) {
 			}
 			scanner = bufio.NewScanner(readFile)
 			defer readFile.Close()
-			go readLineByLine(scanner, channel)
+			go readLineByLine(scanner, channel, fn)
 		}
 	}
 	for i := 0; i < len(arg.Files); i++ {
-		lines = append(lines, <-channel...)
+		lines = fn(lines, <-channel...)
 	}
+	// sort.SortingAlgorithm(&lines)
 	close(channel)
 	return
 }
