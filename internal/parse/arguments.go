@@ -15,11 +15,11 @@ func optionFlags(ops *Options) {
 	flag.Parse()
 }
 
-func ArgumentParsing() *Options {
+func Arguments() *Options {
 	ops := Options{}
 	optionFlags(&ops)
 	ops.Files = flag.Args()
-	if len(ops.Files) == 0 {
+	if len(ops.Files) == 0 || (len(ops.Files) == 1 && ops.Files[0] == "-") {
 		READ_STDIN = true
 	} else if len(ops.Files) > 0 {
 		READ_STDIN = false

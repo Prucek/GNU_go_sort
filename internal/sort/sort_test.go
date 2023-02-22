@@ -25,7 +25,7 @@ func TestSort(t *testing.T) {
 	}
 
 	for _, test := range sortTests {
-		if SortingAlgorithm(&test.input); !reflect.DeepEqual(test.input, test.expected) {
+		if Lines(&test.input); !reflect.DeepEqual(test.input, test.expected) {
 			t.Errorf("Output %q not equal to expected %q", test.input, test.expected)
 		}
 	}

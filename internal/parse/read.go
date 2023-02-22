@@ -6,7 +6,7 @@ import (
 	"os"
 )
 
-var READ_STDIN = false // else reading from Files
+var READ_STDIN = false // modified in arguments.go
 type Append func(lines []string, line ...string) []string
 
 func readLineByLine(scanner *bufio.Scanner, returnChannel chan<- []string, fn Append) {
@@ -47,7 +47,7 @@ func ScanLines(arg *Options, fn Append) (lines []string, err error) {
 	for i := 0; i < len(arg.Files); i++ {
 		lines = fn(lines, <-channel...)
 	}
-	// sort.SortingAlgorithm(&lines)
+	// sort.Lines(&lines)
 	close(channel)
 	return
 }

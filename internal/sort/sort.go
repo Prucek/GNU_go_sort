@@ -5,7 +5,7 @@ import (
 	"strings"
 )
 
-func SortingAlgorithm(lines *[]string) {
+func Lines(lines *[]string) {
 	sort.Slice(*lines, func(i, j int) bool {
 		s1, s2 := (*lines)[i], (*lines)[j]
 		result := strings.Compare(s1, s2)

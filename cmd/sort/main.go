@@ -10,7 +10,7 @@ import (
 
 func main() {
 	var lines []string
-	arg := parse.ArgumentParsing()
+	arg := parse.Arguments()
 	lines, err := parse.ScanLines(arg, sort.BinarySearchAppend)
 	if err != nil {
 		fmt.Println(err)
