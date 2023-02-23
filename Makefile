@@ -17,4 +17,8 @@ tests: build
 	./test/test_multiple.sh
 	./test/test_reverse.sh
 	cd internal/sort && go test
+	cd internal/parse && go test -bench=.
 	cd cmd/sort && go clean
+
+bench: build
+	cd internal/parse && go test -bench=.
