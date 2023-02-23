@@ -1,14 +1,12 @@
 .PHONY: clean
 
-PATH2MAIN := "./cmd/..."
-
 all: build
 
 clean:
-	rm -f sort *.out
+	cd cmd/sort && go clean
 
-build:	
-	go build $(PATH2MAIN)
+build:
+	cd cmd/sort && go build
 
 tests: build
 	./test/test_options.sh
@@ -19,4 +17,4 @@ tests: build
 	./test/test_multiple.sh
 	./test/test_reverse.sh
 	cd internal/sort && go test
-	rm -f sort
+	cd cmd/sort && go clean

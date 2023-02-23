@@ -10,5 +10,5 @@ set -o pipefail
 #native byte values.
 
 LC_ALL=C sort test/longFile.test &> real.out
-./sort test/longFile.test > test.out
+./cmd/sort/sort test/longFile.test > test.out
 ./test/test.sh

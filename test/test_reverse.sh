@@ -7,6 +7,6 @@
 #native byte values.
 
 LC_ALL=C sort -r cmd/sort/main.go &> real.out
-./sort -r cmd/sort/main.go > test.out
+./cmd/sort/sort -r cmd/sort/main.go > test.out
 diff real.out test.out > diff.out
 ./test/test.sh
