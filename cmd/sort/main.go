@@ -11,7 +11,11 @@ import (
 func main() {
 	var lines []string
 	arg := parse.Arguments()
-	lines, err := parse.ScanLines(arg, sort.BinarySearchAppend)
+
+	//naive := parse.SortAlgorithm{FnAppend: tools.AppendWrapper, FnSort: sort.Lines}
+	binary := parse.SortAlgorithm{FnAppend: sort.BinarySearchAppend, FnSort: tools.EmptySortWrapper}
+
+	lines, err := parse.ScanLines(arg, binary)
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(2)

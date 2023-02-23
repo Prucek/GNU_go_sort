@@ -7,25 +7,30 @@ import (
 )
 
 var READ_STDIN = false // modified in arguments.go
-type Append func(lines []string, line ...string) []string
+type AppendFunction func(lines []string, line ...string) []string
+type SortFunction func(lines []string)
+type SortAlgorithm struct {
+	FnAppend AppendFunction
+	FnSort   SortFunction
+}
 
-func readLineByLine(scanner *bufio.Scanner, returnChannel chan<- []string, fn Append) {
+func readLineByLine(scanner *bufio.Scanner, returnChannel chan<- []string, fnAppend AppendFunction) {
 	var lines []string
 	for scanner.Scan() {
 		line := scanner.Text()
-		lines = fn(lines, line)
+		lines = fnAppend(lines, line)
 	}
 	returnChannel <- lines
 }
 
-func ScanLines(arg *Options, fn Append) (lines []string, err error) {
+func ScanLines(arg *Options, algo SortAlgorithm) (lines []string, err error) {
 	var scanner *bufio.Scanner
 	// using 1 channel for each file
 	var channel chan []string
 	if READ_STDIN {
 		channel = make(chan []string, 1)
 		scanner = bufio.NewScanner(os.Stdin)
-		go readLineByLine(scanner, channel, fn)
+		go readLineByLine(scanner, channel, algo.FnAppend)
 
 	} else {
 		channel = make(chan []string, len(arg.Files))
@@ -41,13 +46,13 @@ func ScanLines(arg *Options, fn Append) (lines []string, err error) {
 			}
 			scanner = bufio.NewScanner(readFile)
 			defer readFile.Close()
-			go readLineByLine(scanner, channel, fn)
+			go readLineByLine(scanner, channel, algo.FnAppend)
 		}
 	}
 	for i := 0; i < len(arg.Files); i++ {
-		lines = fn(lines, <-channel...)
+		lines = algo.FnAppend(lines, <-channel...)
 	}
-	// sort.Lines(&lines)
+	algo.FnSort(lines)
 	close(channel)
 	return
 }
