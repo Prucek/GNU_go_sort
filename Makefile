@@ -1,6 +1,24 @@
-all:
-	go build GNU_sort.go
-	./GNU_sort GNU_sort.go
+.PHONY: clean
+
+all: build
 
 clean:
-	rm GNU_sort
+	cd cmd/sort && go clean
+
+build:
+	cd cmd/sort && go build
+
+tests: build
+	./test/test_options.sh
+	./test/test_diff_1.sh
+	./test/test_diff_2.sh
+	./test/test_diff_3.sh
+	./test/test_long.sh
+	./test/test_multiple.sh
+	./test/test_reverse.sh
+	cd internal/sort && go test
+	cd internal/parse && go test -bench=.
+	cd cmd/sort && go clean
+
+bench: build
+	cd internal/parse && go test -bench=.
