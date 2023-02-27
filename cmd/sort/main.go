@@ -2,10 +2,12 @@ package main
 
 import (
 	"fmt"
+	"os"
+
 	"github.com/Prucek/GNU_go_sort/internal/parse"
 	"github.com/Prucek/GNU_go_sort/internal/sort"
+	"github.com/Prucek/GNU_go_sort/internal/utils/slices"
 	"github.com/Prucek/GNU_go_sort/tools"
-	"os"
 )
 
 func main() {
@@ -15,7 +17,20 @@ func main() {
 	//naive := parse.SortAlgorithm{FnAppend: tools.AppendWrapper, FnSort: sort.Lines}
 	binary := parse.SortAlgorithm{FnAppend: sort.BinarySearchAppend, FnSort: tools.EmptySortWrapper}
 
-	lines, err := parse.ScanLines(arg, binary)
+	files, err := arg.OpenFiles()
+	defer func() {
+		for _, f := range files {
+			if err := f.Close(); err != nil {
+				fmt.Println(err)
+				os.Exit(2)
+			}
+		}
+	}()
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(2)
+	}
+	lines, err = parse.ScanLines(slices.ToReaders(files), binary)
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(2)
