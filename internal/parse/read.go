@@ -2,11 +2,9 @@ package parse
 
 import (
 	"bufio"
-	"github.com/Prucek/GNU_go_sort/internal/validate"
-	"os"
+	"io"
 )
 
-var READ_STDIN = false // modified in arguments.go
 type AppendFunction func(lines []string, line ...string) []string
 type SortFunction func(lines []string)
 type SortAlgorithm struct {
@@ -23,33 +21,15 @@ func readLineByLine(scanner *bufio.Scanner, returnChannel chan<- []string, fnApp
 	returnChannel <- lines
 }
 
-func ScanLines(arg *Options, algo SortAlgorithm) (lines []string, err error) {
+func ScanLines(files []io.Reader, algo SortAlgorithm) (lines []string, err error) {
 	var scanner *bufio.Scanner
 	// using 1 channel for each file
-	var channel chan []string
-	if READ_STDIN {
-		channel = make(chan []string, 1)
-		scanner = bufio.NewScanner(os.Stdin)
+	channel := make(chan []string, len(files))
+	for _, f := range files {
+		scanner = bufio.NewScanner(f)
 		go readLineByLine(scanner, channel, algo.FnAppend)
-
-	} else {
-		channel = make(chan []string, len(arg.Files))
-		for i := 0; i < len(arg.Files); i++ {
-			err = validate.IsFile(arg.Files[i])
-			if err != nil {
-				return
-			}
-			var readFile *os.File
-			readFile, err = os.Open(arg.Files[i])
-			if err != nil {
-				return
-			}
-			scanner = bufio.NewScanner(readFile)
-			defer readFile.Close()
-			go readLineByLine(scanner, channel, algo.FnAppend)
-		}
 	}
-	for i := 0; i < len(arg.Files); i++ {
+	for i := 0; i < len(files); i++ {
 		lines = algo.FnAppend(lines, <-channel...)
 	}
 	algo.FnSort(lines)
