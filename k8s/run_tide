@@ -1,0 +1,1 @@
+tide --dry-run=false --config-path=/etc/config/tide.yaml --github-token-path=/etc/github/PAT --github-endpoint=https://api.github.com --github-graphql-endpoint=https://api.github.com/graphql --sync-hourly-tokens=-1 --status-hourly-tokens=-1

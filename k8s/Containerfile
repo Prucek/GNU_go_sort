@@ -1,0 +1,4 @@
+FROM alpine
+COPY tide /usr/local/bin/tide
+ENTRYPOINT /usr/local/bin/tide
+CMD ["apk add git"]
