@@ -1,0 +1,15 @@
+tide:
+  sync_period: 1m
+  queries:
+  - repos:
+    - Prucek/GNU_go_sort
+    labels:
+    - lgtm
+    missingLabels:
+    - do-not-merge
+  merge_method:
+    Prucek/GNU_go_sort: merge
+  blocker_label: tide/merge-blocker
+  squash_label: tide/merge-method-squash
+  rebase_label: tide/merge-method-rebase
+  merge_label: tide/merge-method-merg

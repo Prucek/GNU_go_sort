@@ -1,0 +1,52 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: default
+  name: tide
+  labels:
+    app: tide
+spec:
+  replicas: 1 # Do not scale up.
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: tide
+  template:
+    metadata:
+      labels:
+        app: tide
+    spec:
+      serviceAccountName: tide
+      containers:
+      - name: tide
+        image: 192.168.49.2:5000/alpine-tide:latest
+        imagePullPolicy: IfNotPresent
+        command: ['sh', '-c', 'sleep infinity']
+        # args:
+        # - --dry-run=false
+        # - --config-path=/etc/config/tide.yaml
+        # - --github-token-path=/etc/github/PAT
+        # - --github-endpoint=https://api.github.com
+        # - --github-graphql-endpoint=https://api.github.com/graphql
+        # - --sync-hourly-tokens=-1
+        # - --status-hourly-tokens=-1
+        ports:
+        - name: http
+          containerPort: 8888
+        - name: metrics
+          containerPort: 9090
+        volumeMounts:
+        - name: tide-config
+          mountPath: /etc/config
+          readOnly: true
+        - name: pat
+          mountPath: /etc/github
+          readOnly: true
+      volumes:
+      - name: pat
+        secret:
+          secretName: pat
+      - name: tide-config
+        configMap:
+          name: tide-config
