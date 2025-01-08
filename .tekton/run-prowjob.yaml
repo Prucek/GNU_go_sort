@@ -1,7 +1,7 @@
 gangway_tokenapiVersion: tekton.dev/v1beta1
 kind: Pipeline
 metadata:
-  name: run-prowjob
+  name: run-prowjob-test
 spec:
   description: >-
     Run a parameterized prowjob using gangway
