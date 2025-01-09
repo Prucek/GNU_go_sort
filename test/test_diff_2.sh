@@ -9,6 +9,4 @@ set -o pipefail
 #Set LC_ALL=C to get the traditional sort order that uses
 #native byte values.
 
-LC_ALL=C sort Makefile &> real.out
-./cmd/sort/sort Makefile > test.out
-./test/test.sh
+FILE=Makefile ./test/test.sh
