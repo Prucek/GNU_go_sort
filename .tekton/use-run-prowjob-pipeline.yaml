@@ -1,0 +1,33 @@
+apiVersion: tekton.dev/v1beta1
+kind: Pipeline
+metadata:
+  name: use-run-prowjob-pipeline
+spec:
+  description: >-
+    Run a parameterized prowjob using gangway.
+  params:
+    - name: GANGWAY_TOKEN
+      type: string
+      description: Token to authenticate with gangway
+      default: gangway-token
+    - name: PROWJOB_NAME
+      type: string
+      description: name of the prowjob to trigger
+      default: periodic-image-mirroring-hypershift
+  tasks:
+    - name: run-prowjob
+      displayName: "Running prowjob $(params.PROWJOB_NAME)"
+      taskRef:
+        resolver: bundles
+        params:
+        - name: name
+          value: run-prowjob
+        - name: bundle
+          value: quay.io/prucek/tasks@sha256:9dfefe94a2952b01dad66434789a0ae861b4a3c1e0bcc582d62c86854cbe9f16
+        - name: kind
+          value: task
+      params:
+        - name: PROWJOB_NAME
+          value: periodic-image-mirroring-hypershift
+        - name: GANGWAY_TOKEN
+          value: gangway-token

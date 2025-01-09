@@ -1,0 +1,160 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: run-prowjob
+spec:
+  description: >-
+    Run a parameterized prowjob using gangway.
+  params:
+    - name: GANGWAY_TOKEN
+      type: string
+      description: Token to authenticate with gangway
+      default: gangway-token
+    - name: PROWJOB_NAME
+      description: name of the prowjob to trigger
+      type: string
+      default: periodic-ci-openshift-ci-tools-master-canary-build09
+  results:
+    - name: PROWJOB_ID
+      description: The triggered prowjob id
+    - name: PROWJOB_URL
+      description: The prowjob url to spyglass
+    - name: PROWJOB_STATUS
+      description: The status of the prowjob
+    - name: REFS
+      description: The refs to be used in the prowjob
+  steps:
+    - name: test-metadata
+      image: quay.io/konflux-qe-incubator/konflux-qe-tools:latest
+      workingDir: /workspace
+      env:
+        - name: KONFLUX_COMPONENT_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.labels['appstudio.openshift.io/component']
+        - name: PR_NUMBER
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.labels['pac.test.appstudio.openshift.io/pull-request']
+        - name: PR_SHA
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.labels['pac.test.appstudio.openshift.io/sha']
+        - name: ORG
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.labels['pac.test.appstudio.openshift.io/url-org']
+        - name: REPO
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.labels['pac.test.appstudio.openshift.io/url-repository']
+        # - name: SOURCE_REPO_URL
+        #   valueFrom:
+        #     fieldRef:
+        #       fieldPath: metadata.annotations['pac.test.appstudio.openshift.io/source-repo-url']
+        - name: HEAD_REF
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.annotations['pac.test.appstudio.openshift.io/source-branch']
+        - name: BASE_REF
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.annotations['pac.test.appstudio.openshift.io/branch']
+      script: |
+        #!/bin/bash
+        PR_AUTHOR="$(curl -s https://api.github.com/repos/${ORG}/${REPO}/pulls/${PR_NUMBER} | jq -r .user.login)"
+        BASE_SHA="$(curl -s https://api.github.com/repos/"$ORG"/"$REPO"/branches/"$BASE_REF" | jq .commit.sha)"
+        REFS=$(cat <<EOF
+        {
+          "base_ref" : "$BASE_REF"
+          "base_sha": "$BASE_SHA",
+          "org" : "$ORG",
+          "repo" : "$REPO",
+          "pulls" : [
+            {
+              "author": "$PR_AUTHOR",
+              "head_ref": "$HEAD_REF",
+              "number" : "$PR_NUMBER",
+              "sha" : "$PR_SHA"
+            }
+          ]
+        }
+        EOF
+        )
+        echo -n "${REFS}" | tee $(results.REFS.path)
+    - name: run-prowjob
+      image: registry.access.redhat.com/ubi9/ubi:latest
+      env:
+        - name: REFS_PATH
+          value: $(results.REFS.path)
+        - name: GANGWAY_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: $(params.GANGWAY_TOKEN)
+              key: token
+        - name: PROWJOB_NAME
+          value: $(params.PROWJOB_NAME)
+      script: |
+          #!/usr/bin/env bash
+          REFS=$(cat $REFS_PATH)
+          # PERIODIC = 1;POSTSUBMIT = 2; PRESUBMIT = 3;
+          EXEC_TYPE=1
+          if [[ $PROWJOB_NAME == *"pull"* ]]; then
+              EXEC_TYPE=3
+          fi
+          SPEC=$(cat <<EOF
+          {
+            "job_name": "${PROWJOB_NAME}",
+            "job_execution_type": "${EXEC_TYPE}",
+            "pod_spec_options" : {
+              "annotations" : {
+                "creator": "konflux"
+              }
+            },
+            "refs" : "${REFS}""
+          }
+          EOF
+          )
+          curl -s -X POST -d "$SPEC" \
+          -H "Authorization: Bearer $GANGWAY_TOKEN" \
+          https://gangway-ci.apps.ci.l2s4.p1.openshiftapps.com/v1/executions >output.json
+          dnf install wget jq -y --quiet
+          VERSION=v4.2.0
+          BINARY=yq_linux_amd64
+          wget https://github.com/mikefarah/yq/releases/download/${VERSION}/${BINARY} --quiet -O /usr/bin/yq &&\
+          chmod +x /usr/bin/yq
+          PROWJOB_ID=$(cat output.json | jq -r '.id')
+          curl -s https://prow.ci.openshift.org/prowjob?prowjob=$PROWJOB_ID >pj.yaml
+          PROWJOB_URL=$(cat pj.yaml | yq e --tojson | jq -r '.status.url')
+          echo -n "${PROWJOB_ID}" | tee $(results.PROWJOB_ID.path)
+          echo -n "${PROWJOB_URL}" | tee $(results.PROWJOB_URL.path)
+    - name: report-prowjob-status
+      image: registry.access.redhat.com/ubi9/ubi:latest
+      env:
+        - name: PROWJOB_ID_PATH
+          value: $(results.PROWJOB_ID.path)
+        - name: GANGWAY_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: $(params.GANGWAY_TOKEN)
+              key: token
+      script: |
+          #!/usr/bin/env bash
+          dnf install jq -y --quiet
+          PROWJOB_ID=$(cat $PROWJOB_ID_PATH)
+          while true; do
+              curl -s -H "Authorization: Bearer $GANGWAY_TOKEN" \
+              https://gangway-ci.apps.ci.l2s4.p1.openshiftapps.com/v1/executions/$PROWJOB_ID >output.json
+              STATUS=$(cat output.json | jq '.job_status')
+              if [ "$STATUS" == "\"SUCCESS"\" ]; then
+                  PROWJOB_STATUS="$STATUS"
+                  echo -n "${PROWJOB_STATUS}" | tee $(results.PROWJOB_STATUS.path)
+                  exit 0
+              fi
+              if [ "$STATUS" == "\"FAILURE"\" ] || [ "$STATUS" == "\"ABORTED"\" ] || [ "$STATUS" == "\"ERROR"\" ]; then
+                  PROWJOB_STATUS="$STATUS"
+                  echo -n "${PROWJOB_STATUS}" | tee $(results.PROWJOB_STATUS.path)
+                  exit 1
+              fi
+              sleep 30
+          done
