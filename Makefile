@@ -8,7 +8,7 @@ clean:
 build:
 	cd cmd/sort && go build
 
-tests: build
+tests:
 	./test/test_options.sh
 	./test/test_diff_1.sh
 	./test/test_diff_2.sh
@@ -16,9 +16,9 @@ tests: build
 	./test/test_long.sh
 	./test/test_multiple.sh
 	./test/test_reverse.sh
-	cd internal/sort && go test
-	cd internal/parse && go test -bench=.
-	cd cmd/sort && go clean
+
+unit:
+	go test -v ./...
 
 bench: build
 	cd internal/parse && go test -bench=.

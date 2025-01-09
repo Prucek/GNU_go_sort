@@ -1,0 +1,45 @@
+apiVersion: tekton.dev/v1beta1
+kind: Pipeline
+metadata:
+  name: use-run-prowjob-pipeline
+spec:
+  description: >-
+    Run a parameterized prowjob using gangway.
+  params:
+    - name: GANGWAY_TOKEN
+      type: string
+      description: Token to authenticate with gangway
+      default: gangway-token
+    - name: PROWJOB_NAME
+      type: string
+      description: name of the prowjob to trigger
+      default: periodic-ci-openshift-ci-tools-master-konflux-test-aws
+    - name: MAKE_COMMAND
+      type: string
+      description: 'Make command to run'
+      default: 'make e2e'
+    - description: 'Snapshot of the application'
+      name: SNAPSHOT
+      default: '{"components": [{"name":"test-app", "containerImage": "quay.io/example/repo:latest"}]}'
+      type: string
+  tasks:
+    - name: run-prowjob
+      displayName: "Running prowjob $(params.PROWJOB_NAME)"
+      taskRef:
+        resolver: bundles
+        params:
+        - name: name
+          value: run-prowjob
+        - name: bundle
+          value: quay.io/prucek/tasks@sha256:0fedc605c1d86754fcecbd63ff4330773dfb3786ae177aa450365eb890ab9267
+        - name: kind
+          value: task
+      params:
+        - name: PROWJOB_NAME
+          value: periodic-ci-openshift-ci-tools-master-konflux-test-cluster-claim
+        - name: GANGWAY_TOKEN
+          value: gangway-token
+        - name: MAKE_COMMAND
+          value: make tests
+        - name: SNAPSHOT
+          value: $(params.SNAPSHOT)
