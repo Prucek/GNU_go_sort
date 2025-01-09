@@ -1,0 +1,127 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: run-prowjob
+spec:
+  description: >-
+    Run a parameterized prowjob using gangway.
+  params:
+    - name: GANGWAY_TOKEN
+      type: string
+      description: Token to authenticate with gangway
+      default: gangway-token
+    - name: PROWJOB_NAME
+      description: name of the prowjob to trigger
+      type: string
+      default: periodic-ci-openshift-ci-tools-master-konflux-test-aws
+    - name: SNAPSHOT
+      description: 'Snapshot of the application'
+      default: '{"components": [{"name":"test-app", "containerImage": "quay.io/example/repo:latest"}]}'
+      type: string
+    - name: MAKE_COMMAND
+      description: 'Make command to run'
+      default: 'make e2e'
+      type: string
+  results:
+    - name: PROWJOB_ID
+      description: The triggered prowjob id
+    - name: PROWJOB_URL
+      description: The prowjob url to spyglass
+    - name: PROWJOB_STATUS
+      description: The status of the prowjob
+  steps:
+    - name: run-prowjob
+      image: registry.access.redhat.com/ubi9/ubi:latest
+      env:
+        - name: GANGWAY_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: $(params.GANGWAY_TOKEN)
+              key: token
+        - name: PROWJOB_NAME
+          value: $(params.PROWJOB_NAME)
+        - name: MAKE_COMMAND
+          value: $(params.MAKE_COMMAND)
+        - name: SNAPSHOT
+          value: $(params.SNAPSHOT)
+      script: |
+          #!/usr/bin/env bash
+
+          # PERIODIC = 1;POSTSUBMIT = 2; PRESUBMIT = 3;
+          EXEC_TYPE=1
+          if [[ $PROWJOB_NAME == *"pull"* ]]; then
+              EXEC_TYPE=3
+          fi
+
+          dnf install wget jq -y --quiet
+          VERSION=v4.45.1
+          BINARY=yq_linux_amd64
+          wget https://github.com/mikefarah/yq/releases/download/${VERSION}/${BINARY} --quiet -O /usr/bin/yq &&\
+          chmod +x /usr/bin/yq
+
+          curl https://raw.githubusercontent.com/openshift/release/refs/heads/master/ci-operator/config/openshift/ci-tools/openshift-ci-tools-master.yaml > config.yaml
+          yq -i 'del(.images)' config.yaml 
+          yq -i 'del(.base_images)' config.yaml
+          yq -i 'del(.binary_build_commands)' config.yaml
+          yq -i 'del(.test_binary_build_commands)' config.yaml
+          yq -i 'del(.build_root.from_repository)' config.yaml
+          yq -i 'del( .tests[] | select(.as != "konflux*") )' config.yaml
+          KONFLUX_IMAGE= echo $(SNAPSHOT) | jq -r '.components[0].containerImage'
+          yq -i '(.build_root.project_image.dockerfile_literal = "FROM '${KONFLUX_IMAGE}'")' config.yaml
+          sed -i "s|konflux-image-placeholder|root|g" config.yaml
+          sed -i "s|make-placeholder|$MAKE_COMMAND|g" config.yaml
+          yq -o=json config.yaml | jq -Rs . > config.json
+          SPEC_FILE=$(mktemp)
+          cat <<EOF > "$SPEC_FILE"
+          {
+            "job_name": "${PROWJOB_NAME}",
+            "job_execution_type": "${EXEC_TYPE}",
+            "pod_spec_options": {
+              "envs": {
+                "UNRESOLVED_CONFIG": $(cat config.json)
+              },
+              "annotations": {
+                "creator": "konflux"
+              }
+            }
+          }
+          EOF
+
+          curl -s -X POST -d "@$SPEC_FILE" \
+          -H "Authorization: Bearer $GANGWAY_TOKEN" \
+          https://gangway-ci.apps.ci.l2s4.p1.openshiftapps.com/v1/executions >output.json
+          PROWJOB_ID=$(cat output.json | jq -r '.id')
+          curl -s https://prow.ci.openshift.org/prowjob?prowjob=$PROWJOB_ID >pj.yaml
+          PROWJOB_URL=$(cat pj.yaml | yq e -o=json | jq -r '.status.url')
+          echo -n "${PROWJOB_ID}" | tee $(results.PROWJOB_ID.path)
+          echo -n "${PROWJOB_URL}" | tee $(results.PROWJOB_URL.path)
+    - name: report-prowjob-status
+      image: registry.access.redhat.com/ubi9/ubi:latest
+      env:
+        - name: PROWJOB_ID_PATH
+          value: $(results.PROWJOB_ID.path)
+        - name: GANGWAY_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: $(params.GANGWAY_TOKEN)
+              key: token
+      script: |
+          #!/usr/bin/env bash
+          dnf install jq -y --quiet
+          PROWJOB_ID=$(cat $PROWJOB_ID_PATH)
+          while true; do
+              curl -s -H "Authorization: Bearer $GANGWAY_TOKEN" \
+              https://gangway-ci.apps.ci.l2s4.p1.openshiftapps.com/v1/executions/$PROWJOB_ID >output.json
+              STATUS=$(cat output.json | jq '.job_status')
+              if [ "$STATUS" == "\"SUCCESS"\" ]; then
+                  PROWJOB_STATUS="$STATUS"
+                  echo -n "${PROWJOB_STATUS}" | tee $(results.PROWJOB_STATUS.path)
+                  exit 0
+              fi
+              if [ "$STATUS" == "\"FAILURE"\" ] || [ "$STATUS" == "\"ABORTED"\" ] || [ "$STATUS" == "\"ERROR"\" ]; then
+                  PROWJOB_STATUS="$STATUS"
+                  echo -n "${PROWJOB_STATUS}" | tee $(results.PROWJOB_STATUS.path)
+                  exit 1
+              fi
+              sleep 30
+          done
