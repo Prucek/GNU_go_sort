@@ -1,0 +1,38 @@
+apiVersion: tekton.dev/v1beta1
+kind: Pipeline
+metadata:
+  name: run-prowjob
+spec:
+  description: >-
+    Run a parameterized prowjob using gangway
+  params:
+    - name: GANGWAY_TOKEN
+      type: string
+      description: token to authenticate with gangway
+      default: gangway-token
+  tasks:
+    - name: prowjob-run
+      params:
+        - name: GANGWAY_TOKEN
+          value: $(params.GANGWAY_TOKEN)
+      taskSpec:
+        description: Run a parameterized prowjob using gangway
+        params:
+          - name: GANGWAY_TOKEN
+            description: token to authenticate with gangway
+            type: string
+            default: gangway-token
+        steps:
+          - name: run-prowjob
+            image: quay-proxy.ci.openshift.org/openshift/ci:ocp_ubi-minimal_9
+            env:
+              - name: GANGWAY_TOKEN
+                valueFrom:
+                  secretKeyRef:
+                    name: $(params.GANGWAY_TOKEN)
+                    key: token
+            script: |
+                #!/usr/bin/env bash
+                curl -v -X POST -d '{"job_execution_type": "1",}' \ 
+                -H "Authorization: Bearer $GANGWAY_TOKEN" \ 
+                https://gangway-ci.apps.ci.l2s4.p1.openshiftapps.com/v1/executions/periodic-ci-openshift-ci-tools-master-canary-build09
