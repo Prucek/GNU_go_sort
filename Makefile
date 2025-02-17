@@ -7,6 +7,7 @@ clean:
 
 build:
 	cd cmd/sort && go build
+	chmod +x cmd/sort/sort
 
 tests: build
 	./test/test_options.sh
