@@ -94,10 +94,12 @@ spec:
       value: $(params.DOCKERFILE_ADDITIONS)
     - name: BUNDLE_NS
       value: $(params.BUNDLE_NS)
-    - name: ENVS
-      value: ["$(params.ENVS[*])"]
     script: |
       #!/usr/bin/env bash
+
+      for pair in $(params.ENVS[*]); do
+        export "$pair"
+      done
 
       # Getting tooling
       dnf install wget jq -y --quiet > /dev/null
