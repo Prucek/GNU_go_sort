@@ -9,6 +9,4 @@ set -o pipefail
 #Set LC_ALL=C to get the traditional sort order that uses
 #native byte values.
 
-LC_ALL=C sort cmd/sort/main.go &> real.out
-./cmd/sort/sort cmd/sort/main.go > test.out
-./test/test.sh
+FILE=cmd/sort/main.go ./test/test.sh
