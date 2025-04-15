@@ -1,0 +1,41 @@
+apiVersion: tekton.dev/v1beta1
+kind: Pipeline
+metadata:
+  name: linter-pipeline
+spec:
+    - name: test-metadata
+      taskRef:
+        resolver: git
+        params:
+          - name: url
+            value: https://github.com/konflux-ci/tekton-integration-catalog.git
+          - name: serverURL
+            value: https://github.com
+          - name: revision
+            value: main
+          - name: pathInRepo
+            value: common/tasks/test-metadata/0.2/test-metadata.yaml
+      params:
+        - name: SNAPSHOT
+          value: $(params.SNAPSHOT)
+        - name: test-name
+          value: $(context.pipelineRun.name)
+    - name: yaml-lint
+      runAfter:
+        - test-metadata
+      taskRef:
+        resolver: git
+        params:
+          - name: url
+            value: https://github.com/konflux-ci/tekton-integration-catalog.git
+          - name: serverURL
+            value: https://github.com
+          - name: revision
+            value: yamllint
+          - name: pathInRepo
+            value: common/tasks/linters/yamllint/yaml-lint.yaml
+      params:
+        - name: git-url
+          value: "$(tasks.test-metadata.results.job-spec.git.url)"
+        - name: git-revision
+          value: "$(tasks.test-metadata.results.job-spec.git.revision)"
