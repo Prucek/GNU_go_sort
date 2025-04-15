@@ -42,10 +42,6 @@ spec:
     description: 'Namespace to use if installing bundle image'
     default: ''
     type: string
-  - name: ENVS
-    description: 'Environment variables to pass to the ci-operator config'
-    default: [""]
-    type: array
   results:
   - name: PROWJOB_ID
     description: The triggered prowjob id
@@ -97,10 +93,6 @@ spec:
     script: |
       #!/usr/bin/env bash
 
-      for pair in $(params.ENVS[*]); do
-        export "$pair"
-      done
-
       # Getting tooling
       dnf install wget jq -y --quiet > /dev/null
       VERSION=v4.45.1
@@ -150,7 +142,7 @@ spec:
       yq -i '(.external_images.konflux.name = "'${NAME}'")' config.yaml
       yq -i '(.external_images.konflux.tag = "'${TAG}'")' config.yaml
       yq -i '(.releases.latest.release.version = "'${OPENSHIFT_VERSION}'")' config.yaml
-      yq -i '(.releases.latest.release.architectrue = "amd64")' config.yaml
+      yq -i '(.releases.latest.release.architecture = "amd64")' config.yaml
       yq -i '(.releases.latest.release.channel = "stable")' config.yaml
 
       sed -i "s|konflux-operator-placeholder|pipeline:konflux|g" config.yaml
@@ -205,9 +197,14 @@ spec:
         echo "👉 Probably expired gangway token."
         exit 1
       fi
-      sleep 10
-      curl -s https://prow.ci.openshift.org/prowjob?prowjob=$PROWJOB_ID >pj.yaml
-      PROWJOB_URL=$(cat pj.yaml | yq -r '.status.url')
+      while true; do
+        sleep 10
+        curl -s https://prow.ci.openshift.org/prowjob?prowjob=$PROWJOB_ID >pj.yaml
+        PROWJOB_URL=$(cat pj.yaml | yq -r '.status.url')
+        if [[ -n "$PROWJOB_URL" ]]; then
+          break
+        fi
+      done
 
       echo -n "${PROWJOB_ID}" | tee $(results.PROWJOB_ID.path)
       echo
