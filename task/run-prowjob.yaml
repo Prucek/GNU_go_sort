@@ -224,6 +224,7 @@ spec:
         curl -s -H "Authorization: Bearer $GANGWAY_TOKEN" \
         https://gangway-ci.apps.ci.l2s4.p1.openshiftapps.com/v1/executions/$PROWJOB_ID >output.json
         if ! jq empty output.json 2>/dev/null; then
+          sleep 30
           continue
         fi
         STATUS=$(cat output.json | jq '.job_status')
