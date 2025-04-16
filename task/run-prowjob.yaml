@@ -119,16 +119,16 @@ spec:
       export DOCKERFILE_LITERAL
 
       # Modifiying ci-op config
-      curl -s https://raw.githubusercontent.com/openshift/release/refs/heads/master/ci-operator/config/openshift/ci-tools/openshift-ci-tools-master.yaml > config.yaml
-      yq -i 'del(.build_root.from_repository)' config.yaml
+      curl https://raw.githubusercontent.com/openshift/release/refs/heads/master/ci-operator/config/openshift/konflux-tasks/openshift-konflux-tasks-main.yaml > config.yaml
+      yq -i 'del(.build_root.project_image)' config.yaml
       yq -i '(.build_root.project_image += {"dockerfile_literal": strenv(DOCKERFILE_LITERAL) })' config.yaml
-      yq -i 'del(.images)' config.yaml 
-      yq -i 'del(.base_images)' config.yaml
-      yq -i 'del(.binary_build_commands)' config.yaml
-      yq -i 'del(.releases.latest)' config.yaml
-      yq -i 'del(.test_binary_build_commands)' config.yaml
-      yq -i 'del(.promotion)' config.yaml
-      yq -i 'del( .tests[] | select(.as != "konflux*") )' config.yaml
+      yq -i '(.external_images.konflux.registry = "'${KONFLUX_REGISTRY}'")' config.yaml
+      yq -i '(.external_images.konflux.namespace = "'${KONFLUX_NAMESPACE}'")' config.yaml
+      yq -i '(.external_images.konflux.name = "'${KONFLUX_NAME}'")' config.yaml
+      yq -i '(.external_images.konflux.tag = "'${KONFLUX_TAG}'")' config.yaml
+      yq -i '(.releases.latest.release.version = "'${OPENSHIFT_VERSION}'")' config.yaml
+      yq -i '(.releases.latest.release.architecture = "amd64")' config.yaml
+      yq -i '(.releases.latest.release.channel = "stable")' config.yaml
 
       KONFLUX_IMAGE=$(jq -r --arg component_name "${COMPONENT_NAME}" '.components[] | select(.name == $component_name) | .containerImage' <<< "${SNAPSHOT}")
       # KONFLUX_IMAGE=$(jq -r -c '.components[0].containerImage' <<< "${SNAPSHOT}")
@@ -145,10 +145,9 @@ spec:
       yq -i '(.releases.latest.release.architecture = "amd64")' config.yaml
       yq -i '(.releases.latest.release.channel = "stable")' config.yaml
 
-      sed -i "s|konflux-operator-placeholder|pipeline:konflux|g" config.yaml
-      sed -i "s|bundle-placeholder|pipeline:konflux|g" config.yaml
-      sed -i "s|konflux-artifacts-placeholder|root|g" config.yaml
-      sed -i "s|make-placeholder|$DEPLOY_TEST_COMMAND|g" config.yaml
+      sed -i "s|operator-placeholder|pipeline:konflux|g" config.yaml
+      sed -i "s|operator-placeholder|pipeline:konflux|g" config.yaml
+      sed -i "s|command-placeholder|$COMMAND|g" config.yaml
 
       if [[ $ARCHITECTURE == "arm64" ]]; then
         sed -i "s|amd64|arm64|g" config.yaml
