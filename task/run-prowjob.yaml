@@ -147,7 +147,7 @@ spec:
 
       sed -i "s|operator-placeholder|pipeline:konflux|g" config.yaml
       sed -i "s|operator-placeholder|pipeline:konflux|g" config.yaml
-      sed -i "s|command-placeholder|$COMMAND|g" config.yaml
+      sed -i "s|command-placeholder|$DEPLOY_TEST_COMMAND|g" config.yaml
 
       if [[ $ARCHITECTURE == "arm64" ]]; then
         sed -i "s|amd64|arm64|g" config.yaml
