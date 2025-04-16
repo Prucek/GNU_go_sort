@@ -156,17 +156,17 @@ spec:
       fi
 
       if [[ $BUNDLE_NS != "" ]]; then
-        PROWJOB_NAME="periodic-ci-openshift-ci-tools-master-konflux-test-bundle"
+        PROWJOB_NAME="periodic-ci-openshift-konflux-tasks-main-konflux-test-bundle"
         sed -i "s|operator-ns-placeholder|$BUNDLE_NS|g" config.yaml
         yq -i 'del( .tests[] | select(.as != "*bundle*") )' config.yaml
       elif [[ $CLOUD_PROVIDER == "gcp" ]]; then
-        PROWJOB_NAME="periodic-ci-openshift-ci-tools-master-konflux-test-gcp"
+        PROWJOB_NAME="periodic-ci-openshift-konflux-tasks-main-konflux-test-gcp"
         yq -i 'del( .tests[] | select(.as != "*gcp*") )' config.yaml
       elif [[ $CLOUD_PROVIDER == "azure" ]]; then
-        PROWJOB_NAME="periodic-ci-openshift-ci-tools-master-konflux-test-azure"
+        PROWJOB_NAME="periodic-ci-openshift-konflux-tasks-main-konflux-test-azure"
         yq -i 'del( .tests[] | select(.as != "*azure*") )' config.yaml
       else
-        PROWJOB_NAME="periodic-ci-openshift-ci-tools-master-konflux-test-aws"
+        PROWJOB_NAME="periodic-ci-openshift-konflux-tasks-main-konflux-test-aws"
         yq -i 'del( .tests[] | select(.as != "*aws*") )' config.yaml
       fi
 
@@ -180,9 +180,6 @@ spec:
                 "envs": {
                   "UNRESOLVED_CONFIG": $config
                 },
-                "annotations": {
-                  "creator": "konflux"
-                }
               }
             }')
 
@@ -199,7 +196,7 @@ spec:
       while true; do
         sleep 10
         curl -s https://prow.ci.openshift.org/prowjob?prowjob=$PROWJOB_ID >pj.yaml
-        PROWJOB_URL=$(cat pj.yaml | yq -r '.status.url')
+        PROWJOB_URL=$(cat pj.yaml | yq -r '.status.url // empty')
         if [[ -n "$PROWJOB_URL" ]]; then
           break
         fi
@@ -226,6 +223,9 @@ spec:
       while true; do
         curl -s -H "Authorization: Bearer $GANGWAY_TOKEN" \
         https://gangway-ci.apps.ci.l2s4.p1.openshiftapps.com/v1/executions/$PROWJOB_ID >output.json
+        if ! jq empty output.json 2>/dev/null; then
+          continue
+        fi
         STATUS=$(cat output.json | jq '.job_status')
         if [ "$STATUS" == "\"SUCCESS"\" ]; then
           PROWJOB_STATUS="$STATUS"
