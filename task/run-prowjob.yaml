@@ -71,15 +71,15 @@ spec:
     - name: ORG
       valueFrom:
         fieldRef:
-          fieldPath: metadata.labels['pipelinesascode.tekton.dev/url-org']
+          fieldPath: metadata.labels['pac.test.appstudio.openshift.io/url-org']
     - name: REPO
       valueFrom:
         fieldRef:
-          fieldPath: metadata.labels['pipelinesascode.tekton.dev/url-repository']
+          fieldPath: metadata.labels['pac.test.appstudio.openshift.io/url-repository']
     - name: COMMIT
       valueFrom:
         fieldRef:
-          fieldPath: metadata.labels['pipelinesascode.tekton.dev/sha']
+          fieldPath: metadata.labels['pac.test.appstudio.openshift.io/sha']
     - name: COMPONENT_NAME
       valueFrom:
         fieldRef:
@@ -102,7 +102,7 @@ spec:
 
       # Artifacts Dockerfile
       DOCKERFILE_LITERAL=$(cat <<EOF
-      FROM ${BUILD_ROOT}
+      FROM ${ARTIFACTS_BUILD_ROOT}
       COPY --from=quay-proxy.ci.openshift.org/openshift/ci:ocp_4.18_cli /bin/oc /bin/oc
       COPY --from=quay-proxy.ci.openshift.org/openshift/ci:ocp_4.18_cli /bin/kubectl /bin/kubectl
       RUN umask 0002
