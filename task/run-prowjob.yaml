@@ -32,7 +32,7 @@ spec:
     type: string
   - name: ARTIFACTS_BUILD_ROOT
     description: 'Image to use for building the artifatcs image'
-    default: 'brew.registry.redhat.io/rh-osbs/openshift-golang-builder:rhel_9_1.22'
+    default: 'quay-proxy.ci.openshift.org/ci/ocp_builder_rhel-9-golang-1.22-openshift-4.17'
     type: string
   - name: DOCKERFILE_ADDITIONS
     description: 'Dockerfile additions to use for building the artifatcs image'
