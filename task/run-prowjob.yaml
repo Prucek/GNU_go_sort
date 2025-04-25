@@ -152,6 +152,7 @@ spec:
       if [[ $ARCHITECTURE == "arm64" ]]; then
         sed -i "s|amd64|arm64|g" config.yaml
         yq -i '(.tests[].node_architecture += "arm64")' config.yaml
+        yq -i '(.tests[].steps.node_architecture += "arm64")' config.yaml
       fi
       if [[ $ARCHITECTURE == "multi" ]]; then
         sed -i "s|amd64|multi|g" config.yaml
