@@ -151,8 +151,6 @@ spec:
 
       if [[ $ARCHITECTURE == "arm64" ]]; then
         sed -i "s|amd64|arm64|g" config.yaml
-        yq -i '(.tests[].node_architecture += "arm64")' config.yaml
-        yq -i '(.tests[].steps.node_architecture += "arm64")' config.yaml
       fi
       if [[ $ARCHITECTURE == "multi" ]]; then
         sed -i "s|amd64|multi|g" config.yaml
@@ -173,18 +171,31 @@ spec:
         yq -i 'del( .tests[] | select(.as != "*aws*") )' config.yaml
       fi
 
-      yq -o=json config.yaml | jq -Rs . > config.json
+      yq -o=json config.yaml > config.json
+      MAX_RETRIES=3
+      while true; do
+        if curl -sSf -f -d @config.json https://config.ci.openshift.org/resolve > resolved.json; then
+          break
+        else
+            sleep 10
+        fi
+        MAX_RETRIES=$((MAX_RETRIES - 1))
+        if [ $MAX_RETRIES -le 0 ]; then
+          echo "❌ Error: Config resolver is probably down."
+          exit 1
+        fi
+      done
+      GZIP_SPEC=$(gzip -c resolved.json | base64 -w0)
       payload=$(jq -n --arg job "$PROWJOB_NAME" \
-            --argjson config "$(cat config.json)" \
-            '{
-              "job_name": $job,
-              "job_execution_type": "1",
-              "pod_spec_options": {
-                "envs": {
-                  "UNRESOLVED_CONFIG": $config
-                },
-              }
-            }')
+        '{
+          "job_name": $job,
+          "job_execution_type": "1",
+          "pod_spec_options": {
+            "envs": {
+              "CONFIG_SPEC": "${GZIP_SPEC}",
+            },
+          }
+        }')
 
       # Triggering PJ via gangway and getting ID/URL
       curl -s -X POST -H "Authorization: Bearer $GANGWAY_TOKEN" \
