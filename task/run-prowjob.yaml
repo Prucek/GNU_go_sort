@@ -127,6 +127,7 @@ spec:
       # Modifiying ci-op config
       curl -s https://raw.githubusercontent.com/openshift/release/refs/heads/master/ci-operator/config/openshift/konflux-tasks/openshift-konflux-tasks-main.yaml > config.yaml
       yq -i 'del(.build_root.project_image)' config.yaml
+      yq -i 'del(.tests[].steps.test[].cli)' config.yaml
       yq -i '(.build_root.project_image += {"dockerfile_literal": strenv(DOCKERFILE_LITERAL) })' config.yaml
       yq -i '(.external_images.konflux.registry = "'${KONFLUX_REGISTRY}'")' config.yaml
       yq -i '(.external_images.konflux.namespace = "'${KONFLUX_NAMESPACE}'")' config.yaml
