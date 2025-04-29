@@ -186,13 +186,13 @@ spec:
         fi
       done
       GZIP_SPEC=$(gzip -c resolved.json | base64 -w0)
-      payload=$(jq -n --arg job "$PROWJOB_NAME" \
+      payload=$(jq -n --arg job "$PROWJOB_NAME" --arg config "$GZIP_SPEC" \
         '{
           "job_name": $job,
           "job_execution_type": "1",
           "pod_spec_options": {
             "envs": {
-              "CONFIG_SPEC": "${GZIP_SPEC}",
+              "CONFIG_SPEC": $config,
             },
           }
         }')
