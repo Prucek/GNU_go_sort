@@ -27,7 +27,7 @@ spec:
     default: '4.18'
     type: string
   - name: ARCHITECTURE
-    description: 'Architecture to test against. amd64, arm64 or multi'
+    description: 'Architecture to test against. amd64, arm64'
     default: 'amd64'
     type: string
   - name: ARTIFACTS_BUILD_ROOT
@@ -129,14 +129,6 @@ spec:
       yq -i 'del(.build_root.project_image)' config.yaml
       yq -i 'del(.tests[].steps.test[].cli)' config.yaml
       yq -i '(.build_root.project_image += {"dockerfile_literal": strenv(DOCKERFILE_LITERAL) })' config.yaml
-      yq -i '(.external_images.konflux.registry = "'${KONFLUX_REGISTRY}'")' config.yaml
-      yq -i '(.external_images.konflux.namespace = "'${KONFLUX_NAMESPACE}'")' config.yaml
-      yq -i '(.external_images.konflux.name = "'${KONFLUX_NAME}'")' config.yaml
-      yq -i '(.external_images.konflux.tag = "'${KONFLUX_TAG}'")' config.yaml
-      yq -i '(.releases.latest.release.version = "'${OPENSHIFT_VERSION}'")' config.yaml
-      yq -i '(.releases.latest.release.architecture = "amd64")' config.yaml
-      yq -i '(.releases.latest.release.channel = "stable")' config.yaml
-
       KONFLUX_IMAGE=$(jq -r --arg component_name "${COMPONENT_NAME}" '.components[] | select(.name == $component_name) | .containerImage' <<< "${SNAPSHOT}")
       # KONFLUX_IMAGE=$(jq -r -c '.components[0].containerImage' <<< "${SNAPSHOT}")
       TAG=$(echo "$KONFLUX_IMAGE" | cut -d':' -f2)
@@ -159,9 +151,6 @@ spec:
       # Arch specific modifications
       if [[ $ARCHITECTURE == "arm64" ]]; then
         sed -i "s|amd64|arm64|g" config.yaml
-      fi
-      if [[ $ARCHITECTURE == "multi" ]]; then
-        sed -i "s|amd64|arm64|g" config.yaml
         yq -i '(.releases.latest.release.architecture = "multi")' config.yaml
       fi
 
@@ -180,6 +169,7 @@ spec:
         PROWJOB_NAME="periodic-ci-openshift-konflux-tasks-main-konflux-test-bundle"
         sed -i "s|ns-placeholder|$BUNDLE_NS|g" config.yaml
         yq -i 'del( .tests[] | select(.as != "*bundle*") )' config.yaml
+        yq -i 'del(.tests[].steps.env.OO_INSTALL_MODE)' config.yaml
       elif [[ $CLOUD_PROVIDER == "gcp" ]]; then
         PROWJOB_NAME="periodic-ci-openshift-konflux-tasks-main-konflux-test-gcp"
         yq -i 'del( .tests[] | select(.as != "*gcp*") )' config.yaml
