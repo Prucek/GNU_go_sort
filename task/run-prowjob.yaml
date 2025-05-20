@@ -6,46 +6,55 @@ spec:
   description: >-
     Run a parameterized prowjob using gangway.
   params:
-  - name: GANGWAY_TOKEN
-    type: string
-    description: Token to authenticate with gangway
-    default: gangway-token
-  - name: CLOUD_PROVIDER
-    description: 'Cloud provider to use for the test (one of aws, gcp, azure)'
-    default: aws
-    type: string
   - name: SNAPSHOT
     description: 'Snapshot of the application'
-    default: '{"components": [{"name":"test-app", "containerImage": "quay.io/example/repo:latest"}]}'
+  - name: GANGWAY_TOKEN
     type: string
-  - name: DEPLOY_TEST_COMMAND
-    description: 'Command to run for deploying the test'
-    default: 'make e2e'
+    default: gangway-token
+    description: Token to authenticate with gangway
+
+  # Test parameters
+  - name: CLOUD_PROVIDER
     type: string
+    default: aws
+    description: 'Cloud provider to use for the test (one of aws, gcp, azure)'
   - name: OPENSHIFT_VERSION
-    description: 'OpenShift version to test against'
+    type: string
     default: '4.18'
-    type: string
+    description: 'OpenShift version to test against'
   - name: ARCHITECTURE
-    description: 'Architecture to test against. amd64, arm64'
+    type: string
     default: 'amd64'
-    type: string
+    description: 'Architecture to test against. amd64, arm64'
+
+  # Artifacts image parameters
   - name: ARTIFACTS_BUILD_ROOT
-    description: 'Image to use for building the artifatcs image'
-    default: 'quay-proxy.ci.openshift.org/openshift/ci:ocp_builder_rhel-9-golang-1.22-openshift-4.17'
     type: string
+    description: 'Image to use for building the artifatcs image, e.g. quay-proxy.ci.openshift.org/openshift/ci:ocp_builder_rhel-9-golang-1.22-openshift-4.17'
   - name: DOCKERFILE_ADDITIONS
-    description: 'Dockerfile additions to use for building the artifatcs image'
-    default: 'RUN make build'
     type: string
+    description: 'Dockerfile additions to use for building the artifatcs image, e.g. RUN make build'
+  - name: DEPLOY_TEST_COMMAND
+    type: string
+    description: 'Command that deploys and tests the OPERATOR_IMAGE on the cluster, e.g. make deploy && make test'
+  
+  # Special parameters
+  - name: PRE_TEST_COMMAND
+    type: string
+    default: ''
+    description: 'Pre-test command to run before the test, e.g. oc apply ...'
   - name: BUNDLE_NS
+    type: string
+    default: ''
     description: 'Namespace to use if installing bundle image'
-    default: ''
+  - name: PULL_SECRET
     type: string
+    default: ''
+    description: 'Secret created by the user in https://vault.ci.openshift.org/ in the test-credential namespace with the field .dockerconfigjson. Necessary for private images'
   - name: ENVS
-    description: 'Optional environment variables to inject into the test; separated by commas; e.g. VAR1=val1,VAR2=val2'
-    default: ''
     type: string
+    default: ''
+    description: 'Optional environment variables to inject into the test; separated by commas; e.g. VAR1=val1,VAR2=val2'
   results:
   - name: PROWJOB_ID
     description: The triggered prowjob id
@@ -92,6 +101,8 @@ spec:
       value: $(params.ARTIFACTS_BUILD_ROOT)
     - name: DOCKERFILE_ADDITIONS
       value: $(params.DOCKERFILE_ADDITIONS)
+    - name: PRE_TEST_COMMAND
+      value: $(params.PRE_TEST_COMMAND)
     - name: BUNDLE_NS
       value: $(params.BUNDLE_NS)
     - name: ENVS
@@ -140,6 +151,7 @@ spec:
       yq -i '(.external_images.konflux.namespace = "'${NAMESPACE}'")' config.yaml
       yq -i '(.external_images.konflux.name = "'${NAME}'")' config.yaml
       yq -i '(.external_images.konflux.tag = "'${TAG}'")' config.yaml
+      yq -i '(.external_images.konflux.pull_secret = "'${PULL_SECRET}'")' config.yaml
       yq -i '(.releases.latest.release.version = "'${OPENSHIFT_VERSION}'")' config.yaml
       yq -i '(.releases.latest.release.architecture = "amd64")' config.yaml
       yq -i '(.releases.latest.release.channel = "stable")' config.yaml
@@ -181,6 +193,13 @@ spec:
         yq -i 'del( .tests[] | select(.as != "*aws*") )' config.yaml
       fi
 
+      # Pre-test command
+      if [[ -n "$PRE_TEST_COMMAND" ]]; then
+        yq -i '.tests[].steps.pre = [ .tests[].steps.test[0] ]' config.yaml
+        yq -i '.tests[].steps.pre[0].as = "konflux-pre"' config.yaml
+        yq -i '.tests[].steps.pre[0].commands = "'${PRE_TEST_COMMAND}'"' config.yaml
+      fi
+
       # Querying config resolver to get the resolved config
       yq -o=json config.yaml > config.json
       MAX_RETRIES=3
@@ -200,10 +219,14 @@ spec:
       # Specifying the gangway options
       GZIP_SPEC=$(gzip -c resolved.json | base64 -w0)
       payload=$(jq -n --arg job "$PROWJOB_NAME" --arg config "$GZIP_SPEC" \
+        --arg org "$ORG" --arg repo "$REPO" \
         '{
           "job_name": $job,
           "job_execution_type": "1",
           "pod_spec_options": {
+            "annotations": {
+              "ci.openshift.io/konflux-repo" : ($org + "/" + $repo),
+            },
             "envs": {
               "CONFIG_SPEC": $config,
             },
