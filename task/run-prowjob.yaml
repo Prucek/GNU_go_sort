@@ -105,6 +105,8 @@ spec:
       value: $(params.PRE_TEST_COMMAND)
     - name: BUNDLE_NS
       value: $(params.BUNDLE_NS)
+    - name: PULL_SECRET
+      value: $(params.PULL_SECRET)
     - name: ENVS
       value: $(params.ENVS)
     script: |
@@ -151,7 +153,9 @@ spec:
       yq -i '(.external_images.konflux.namespace = "'${NAMESPACE}'")' config.yaml
       yq -i '(.external_images.konflux.name = "'${NAME}'")' config.yaml
       yq -i '(.external_images.konflux.tag = "'${TAG}'")' config.yaml
-      yq -i '(.external_images.konflux.pull_secret = "'${PULL_SECRET}'")' config.yaml
+      if [[ -n "$PULL_SECRET" ]]; then
+        yq -i '(.external_images.konflux.pull_secret = "'${PULL_SECRET}'")' config.yaml
+      fi
       yq -i '(.releases.latest.release.version = "'${OPENSHIFT_VERSION}'")' config.yaml
       yq -i '(.releases.latest.release.architecture = "amd64")' config.yaml
       yq -i '(.releases.latest.release.channel = "stable")' config.yaml
@@ -195,9 +199,9 @@ spec:
 
       # Pre-test command
       if [[ -n "$PRE_TEST_COMMAND" ]]; then
-        yq -i '.tests[].steps.pre = [ .tests[].steps.test[0] ]' config.yaml
-        yq -i '.tests[].steps.pre[0].as = "konflux-pre"' config.yaml
-        yq -i '.tests[].steps.pre[0].commands = "'${PRE_TEST_COMMAND}'"' config.yaml
+        yq -i '.tests[0].steps.pre = [ .tests[].steps.test[0] ]' config.yaml
+        yq -i '.tests[0].steps.pre[0].as = "konflux-pre"' config.yaml
+        yq -i '.tests[0].steps.pre[0].commands = env(PRE_TEST_COMMAND)' config.yaml
       fi
 
       # Querying config resolver to get the resolved config
