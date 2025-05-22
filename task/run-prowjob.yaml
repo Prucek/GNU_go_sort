@@ -199,9 +199,10 @@ spec:
 
       # Pre-test command
       if [[ -n "$PRE_TEST_COMMAND" ]]; then
-        yq -i '.tests[0].steps.pre = [ .tests[].steps.test[0] ]' config.yaml
-        yq -i '.tests[0].steps.pre[0].as = "konflux-pre"' config.yaml
-        yq -i '.tests[0].steps.pre[0].commands = env(PRE_TEST_COMMAND)' config.yaml
+        yq -i '.tests[0].steps.pre = [ {"chain": "ipi-aws-pre"} ]' config.yaml
+        yq -i '.tests[0].steps.pre += [ .tests[].steps.test[0] ]' config.yaml
+        yq -i '.tests[0].steps.pre[1].as = "konflux-pre"' config.yaml
+        yq -i '.tests[0].steps.pre[1].commands = env(PRE_TEST_COMMAND)' config.yaml
       fi
 
       # Querying config resolver to get the resolved config
