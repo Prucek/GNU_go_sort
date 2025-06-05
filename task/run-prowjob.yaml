@@ -30,19 +30,19 @@ spec:
   # Artifacts image parameters
   - name: ARTIFACTS_BUILD_ROOT
     type: string
-    description: 'Image to use for building the artifatcs image, e.g. quay-proxy.ci.openshift.org/openshift/ci:ocp_builder_rhel-9-golang-1.22-openshift-4.17'
+    description: 'Image to use for building the artifacts image, e.g. quay-proxy.ci.openshift.org/openshift/ci:ocp_builder_rhel-9-golang-1.22-openshift-4.17'
   - name: DOCKERFILE_ADDITIONS
     type: string
-    description: 'Dockerfile additions to use for building the artifatcs image, e.g. RUN make build'
+    description: 'Dockerfile additions to use for building the artifacts image, e.g. RUN make build'
   - name: DEPLOY_TEST_COMMAND
     type: string
     description: 'Command that deploys and tests the OPERATOR_IMAGE on the cluster, e.g. make deploy && make test'
   
   # Special parameters
-  - name: PRE_TEST_COMMAND
+  - name: BUNDLE_PRE_TEST_COMMAND
     type: string
     default: ''
-    description: 'Pre-test command to run before the test, e.g. oc apply ...'
+    description: 'Only use with bundle image test! Pre-test command to run before the test, e.g. oc apply ...'
   - name: BUNDLE_NS
     type: string
     default: ''
@@ -101,8 +101,8 @@ spec:
       value: $(params.ARTIFACTS_BUILD_ROOT)
     - name: DOCKERFILE_ADDITIONS
       value: $(params.DOCKERFILE_ADDITIONS)
-    - name: PRE_TEST_COMMAND
-      value: $(params.PRE_TEST_COMMAND)
+    - name: BUNDLE_PRE_TEST_COMMAND
+      value: $(params.BUNDLE_PRE_TEST_COMMAND)
     - name: BUNDLE_NS
       value: $(params.BUNDLE_NS)
     - name: PULL_SECRET
@@ -184,6 +184,9 @@ spec:
       if [[ $BUNDLE_NS != "" ]]; then
         PROWJOB_NAME="periodic-ci-openshift-konflux-tasks-main-konflux-test-bundle"
         sed -i "s|ns-placeholder|$BUNDLE_NS|g" config.yaml
+        sed -i "s|optional-operators-ci-operator-sdk-aws|optional-operators-ci-operator-sdk-$CLOUD_PROVIDER|g" config.yaml
+        cluster_profile=$(yq '( .tests[] | select(.as == "*'${CLOUD_PROVIDER}'*") |.steps.cluster_profile )' config.yaml)
+        sed -i "s|cluster_profile: aws|cluster_profile: $cluster_profile|g" config.yaml
         yq -i 'del( .tests[] | select(.as != "*bundle*") )' config.yaml
         yq -i 'del(.tests[].steps.env.OO_INSTALL_MODE)' config.yaml
       elif [[ $CLOUD_PROVIDER == "gcp" ]]; then
@@ -197,12 +200,13 @@ spec:
         yq -i 'del( .tests[] | select(.as != "*aws*") )' config.yaml
       fi
 
-      # Pre-test command
-      if [[ -n "$PRE_TEST_COMMAND" ]]; then
-        yq -i '.tests[0].steps.pre = [ {"chain": "ipi-aws-pre"} ]' config.yaml
+      # Bundle pre-test command
+      if [[ -n "$BUNDLE_PRE_TEST_COMMAND" ]]; then
+        yq -i '.tests[0].steps.pre =  [ {"chain": "ipi-"+"'${CLOUD_PROVIDER}'"+"-pre"} ]' config.yaml
+        yq -i '.tests[0].steps.pre += [ {"chain": "optional-operators-operator-sdk"} ]' config.yaml
         yq -i '.tests[0].steps.pre += [ .tests[].steps.test[0] ]' config.yaml
-        yq -i '.tests[0].steps.pre[1].as = "konflux-pre"' config.yaml
-        yq -i '.tests[0].steps.pre[1].commands = env(PRE_TEST_COMMAND)' config.yaml
+        yq -i '.tests[0].steps.pre[2].as = "konflux-pre"' config.yaml
+        yq -i '.tests[0].steps.pre[2].commands = env(BUNDLE_PRE_TEST_COMMAND)' config.yaml
       fi
 
       # Querying config resolver to get the resolved config
