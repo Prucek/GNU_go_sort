@@ -203,7 +203,7 @@ spec:
       # Bundle pre-test command
       if [[ -n "$BUNDLE_PRE_TEST_COMMAND" ]]; then
         yq -i '.tests[0].steps.pre =  [ {"chain": "ipi-"+"'${CLOUD_PROVIDER}'"+"-pre"} ]' config.yaml
-        yq -i '.tests[0].steps.pre += [ {"chain": "optional-operators-operator-sdk"} ]' config.yaml
+        yq -i '.tests[0].steps.pre += [ {"ref": "optional-operators-operator-sdk"} ]' config.yaml
         yq -i '.tests[0].steps.pre += [ .tests[].steps.test[0] ]' config.yaml
         yq -i '.tests[0].steps.pre[2].as = "konflux-pre"' config.yaml
         yq -i '.tests[0].steps.pre[2].commands = env(BUNDLE_PRE_TEST_COMMAND)' config.yaml
