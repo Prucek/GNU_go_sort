@@ -82,6 +82,8 @@ spec:
       value: $(params.DEPLOY_TEST_COMMAND)
     - name: OPENSHIFT_VERSION
       value: $(params.OPENSHIFT_VERSION)
+    - name: CHANNEL_STREAM
+      value: $(params.CHANNEL_STREAM)
     - name: ARCHITECTURE
       value: $(params.ARCHITECTURE)
     - name: SNAPSHOT
@@ -172,6 +174,7 @@ spec:
         minor=$(echo "$OPENSHIFT_VERSION" | cut -d. -f2)
         minor_plus_one=$((minor + 1))
         yq -i '(.releases.latest.prerelease.product = "ocp" )' config.yaml
+        yq -i '(.releases.latest.prerelease.architecture = "amd64")' config.yaml
         yq -i '(.releases.latest.prerelease.version_bounds.lower = "4.'${minor}'.0-0")' config.yaml
         yq -i '(.releases.latest.prerelease.version_bounds.upper = "4.'${minor_plus_one}'.0-0")' config.yaml
         yq -i '(.releases.latest.prerelease.version_bounds.stream = "'${CHANNEL_STREAM}'")' config.yaml
