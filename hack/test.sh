@@ -5,13 +5,14 @@ export OPENSHIFT_VERSION
 CHANNEL_STREAM="4-stable"
 export CHANNEL_STREAM
 ARCHITECTURE="arm64"
-CLOUD_PROVIDER="aws"
-ENVS=""
+CLOUD_PROVIDER="gcp"
+ENVS="OO_PACKAGE=stable,OO_CHANNEL=foo,OO_INSTALL_MODE=bar"
 
 #OPERATOR IMAGE KONFLUX_IMAGE="quay.io/redhat-user-workloads/multiarch-tuning-ope-tenant/multiarch-tuning-operator/multiarch-tuning-operator@sha256:9220d65fc6d0df44f58300baeab9792b0fca8c1b9ad6fdd7be92fbf7672a04e6"
 #BUNDLE IMAGE
 KONFLUX_IMAGE="quay.io/redhat-user-workloads/multiarch-tuning-ope-tenant/multiarch-tuning-operator/multiarch-tuning-operator-bundle@sha256:981b8fe5df2f3e4a46bf1a11dde8361f9cfc6a8d9f45dd27b4650ae1dea65677"
-BUNDLE_NS="openshift-multiarch-tuning-operator"
+# BUNDLE_NS="openshift-multiarch-tuning-operator"
+CATALOG_NS="openshift-multiarch-tuning-operator"
 
 KONFLUX_TAG=$(echo "$KONFLUX_IMAGE" | cut -d':' -f2)
 KONFLUX_RNN=$(echo "$KONFLUX_IMAGE" | cut -d':' -f1)
@@ -108,13 +109,23 @@ if [[ -n "$ENVS" ]]; then
   done
 fi
 
-if [[ $BUNDLE_NS != "" ]]; then
-  PROWJOB_NAME="periodic-ci-openshift-konflux-tasks-main-konflux-test-bundle"
-  sed -i "s|ns-placeholder|$BUNDLE_NS|g" config.yaml
+update_config() {
+  ns=$1
+  test_type=$2
+  sed -i "s|ns-placeholder|$ns|g" config.yaml
   sed -i "s|optional-operators-ci-operator-sdk-aws|optional-operators-ci-operator-sdk-$CLOUD_PROVIDER|g" config.yaml
+  sed -i "s|optional-operators-ci-aws|optional-operators-ci-$CLOUD_PROVIDER|g" config.yaml
   cluster_profile=$(yq '( .tests[] | select(.as == "*'${CLOUD_PROVIDER}'*") |.steps.cluster_profile )' config.yaml)
   sed -i "s|cluster_profile: aws|cluster_profile: $cluster_profile|g" config.yaml
-  yq -i 'del( .tests[] | select(.as != "*bundle*") )' config.yaml
+  yq -i 'del( .tests[] | select(.as != "*'"${test_type}"'*") )' config.yaml
+}
+
+if [[ $BUNDLE_NS != "" ]]; then
+  PROWJOB_NAME="periodic-ci-openshift-konflux-tasks-main-konflux-test-bundle"
+  update_config "$BUNDLE_NS" "bundle"
+elif [[ $CATALOG_NS != "" ]]; then
+  PROWJOB_NAME="periodic-ci-openshift-konflux-tasks-main-konflux-test-catalog"
+  update_config "$CATALOG_NS" "catalog"
 elif [[ $CLOUD_PROVIDER == "gcp" ]]; then
   PROWJOB_NAME="periodic-ci-openshift-konflux-tasks-main-konflux-test-gcp"
   yq -i 'del( .tests[] | select(.as != "*gcp*") )' config.yaml
@@ -126,7 +137,7 @@ else
   yq -i 'del( .tests[] | select(.as != "*aws*") )' config.yaml
 fi
 
-BUNDLE_PRE_TEST_COMMAND="oc apply -k ./deploy/envs/prow-konflux-bundle"
+#BUNDLE_PRE_TEST_COMMAND="oc apply -k ./deploy/envs/prow-konflux-bundle"
 export BUNDLE_PRE_TEST_COMMAND
 # Pre-test command
 if [[ -n "$BUNDLE_PRE_TEST_COMMAND" ]]; then
