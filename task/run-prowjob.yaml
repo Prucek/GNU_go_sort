@@ -150,7 +150,7 @@ spec:
       )
       export DOCKERFILE_LITERAL
 
-      # Modifiying ci-op config
+      # Modifying ci-op config
       curl -s https://raw.githubusercontent.com/openshift/release/refs/heads/master/ci-operator/config/openshift/konflux-tasks/openshift-konflux-tasks-main.yaml > config.yaml
       yq -i 'del(.build_root.project_image)' config.yaml
       yq -i 'del(.tests[].steps.test[].cli)' config.yaml

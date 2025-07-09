@@ -1,0 +1,79 @@
+apiVersion: tekton.dev/v1beta1
+kind: Pipeline
+metadata:
+  name: inject-ci-operator
+spec:
+  description: >-
+    Run a parameterized prowjob using gangway.
+  params:
+    - name: GANGWAY_TOKEN
+      type: string
+      description: Token to authenticate with gangway
+      default: gangway-token
+    - description: 'Snapshot of the application'
+      name: SNAPSHOT
+      default: '{"components": [{"name":"test-app", "containerImage": "quay.io/example/repo:latest"}]}'
+      type: string
+  tasks:
+    - name: run-prowjob
+      displayName: "Running prowjob $(params.PROWJOB_NAME)"
+      taskRef:
+        resolver: git
+        params:
+        - name: url
+          value: https://github.com/Prucek/GNU_go_sort
+        - name: revision
+          value: master
+        - name: pathInRepo
+          value: task/inject-ci-operator.yaml
+      params:
+        - name: SNAPSHOT
+          value: $(params.SNAPSHOT)
+        - name: ARTIFACTS_BUILD_ROOT
+          value: "quay-proxy.ci.openshift.org/openshift/ci:openshift_release_golang-1.22"
+        - name: CI_OPERATOR_CONFIG
+          value: |
+            base_images:
+              cli:
+                name: "4.18"
+                namespace: ocp
+                tag: cli
+              rosa-aws-cli:
+                name: rosa-aws-cli
+                namespace: ci
+                tag: latest
+              tests-private:
+                name: tests-private
+                namespace: ci
+                tag: "4.18"
+              upi-installer:
+                name: "4.18"
+                namespace: ocp
+                tag: upi-installer
+            releases:
+              latest:
+                candidate:
+                  architecture: amd64
+                  product: ocp
+                  stream: nightly
+                  version: "4.18"
+            resources:
+              '*':
+                requests:
+                  cpu: 100m
+                  memory: 200Mi
+            tests:
+              - as: konflux-test-bundle
+                cron: '@weekly'
+                steps:
+                  cluster_profile: aws-qe
+                  env:
+                    BASE_DOMAIN: qe.devcluster.openshift.com
+                    INDEX_IMG: pipeline:konflux
+                    TEST_FILTERS: ~NonPreRelease&
+                    TEST_SCENARIOS: cert-manager
+                  test:
+                  - chain: cert-manager-install
+                  - ref: openshift-extended-test
+                  - ref: openshift-e2e-test-qe-report
+                  workflow: cucushift-installer-rehearse-aws-ipi
