@@ -2,17 +2,23 @@
 
 OPENSHIFT_VERSION="4.17.22"
 export OPENSHIFT_VERSION
-CHANNEL_STREAM="4-stable"
+CHANNEL_STREAM="nightly"
 export CHANNEL_STREAM
 ARCHITECTURE="arm64"
 CLOUD_PROVIDER="gcp"
-ENVS="OO_PACKAGE=stable,OO_CHANNEL=foo,OO_INSTALL_MODE=bar"
-
+# ENVS="OO_PACKAGE=stable,OO_CHANNEL=foo,OO_INSTALL_MODE=bar"
+# external_images:
+#   konflux:
+#     registry: quay.io
+#     namespace: prucek
+#     name: multiop
+#     tag: bundle
 #OPERATOR IMAGE KONFLUX_IMAGE="quay.io/redhat-user-workloads/multiarch-tuning-ope-tenant/multiarch-tuning-operator/multiarch-tuning-operator@sha256:9220d65fc6d0df44f58300baeab9792b0fca8c1b9ad6fdd7be92fbf7672a04e6"
 #BUNDLE IMAGE
-KONFLUX_IMAGE="quay.io/redhat-user-workloads/multiarch-tuning-ope-tenant/multiarch-tuning-operator/multiarch-tuning-operator-bundle@sha256:981b8fe5df2f3e4a46bf1a11dde8361f9cfc6a8d9f45dd27b4650ae1dea65677"
-# BUNDLE_NS="openshift-multiarch-tuning-operator"
-CATALOG_NS="openshift-multiarch-tuning-operator"
+# KONFLUX_IMAGE="quay.io/redhat-user-workloads/multiarch-tuning-ope-tenant/multiarch-tuning-operator/multiarch-tuning-operator-bundle@sha256:981b8fe5df2f3e4a46bf1a11dde8361f9cfc6a8d9f45dd27b4650ae1dea65677"
+KONFLUX_IMAGE="quay.io/prucek/multiop:bundle"
+BUNDLE_NS="openshift-multiarch-tuning-operator"
+# CATALOG_NS="openshift-multiarch-tuning-operator"
 
 KONFLUX_TAG=$(echo "$KONFLUX_IMAGE" | cut -d':' -f2)
 KONFLUX_RNN=$(echo "$KONFLUX_IMAGE" | cut -d':' -f1)
@@ -31,7 +37,7 @@ EOF
 )
 ORG=openshift
 REPO=multiarch-tuning-operator
-COMMIT=main
+COMMIT=7204ed73c1c34780afbab88190595f47dc02a28f
 BUILD_ROOT=quay-proxy.ci.openshift.org/openshift/ci:ocp_builder_rhel-9-golang-1.23-openshift-4.19
 
 DOCKERFILE_LITERAL=$(cat <<EOF
@@ -137,7 +143,7 @@ else
   yq -i 'del( .tests[] | select(.as != "*aws*") )' config.yaml
 fi
 
-#BUNDLE_PRE_TEST_COMMAND="oc apply -k ./deploy/envs/prow-konflux-bundle"
+BUNDLE_PRE_TEST_COMMAND="oc apply -k ./deploy/envs/prow-konflux-bundle"
 export BUNDLE_PRE_TEST_COMMAND
 # Pre-test command
 if [[ -n "$BUNDLE_PRE_TEST_COMMAND" ]]; then
