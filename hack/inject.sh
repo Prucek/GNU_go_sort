@@ -1,26 +1,32 @@
 #!/usr/bin/env bash
 
 KONFLUX_IMAGE="quay.io/prucek/multiop:bundle"
+PROWJOB_NAME="periodic-ci-openshift-multiarch-tuning-operator-main-ocp418-e2e-aws-ovn-proxy-mto-origin"
+VARIANT="ocp418"
+IMAGE_IN_CONFIG="multiarch-tuning-operator"
+ORG=openshift
+REPO=multiarch-tuning-operator
+COMMIT=main
+TARGET_BRANCH=main
+DRY_RUN=0
+ARTIFACTS_BUILD_ROOT=quay-proxy.ci.openshift.org/openshift/ci:ocp_builder_rhel-9-golang-1.23-openshift-4.19
+INCLUDE_IMAGES=1
+INCLUDE_OPERATOR=1
+ENVS=""
 
-KONFLUX_TAG=$(echo "$KONFLUX_IMAGE" | cut -d':' -f2)
-KONFLUX_RNN=$(echo "$KONFLUX_IMAGE" | cut -d':' -f1)
-KONFLUX_NAME=$(echo "$KONFLUX_RNN" | rev | cut -d'/' -f1 | rev)
-KONFLUX_NAMESPACE=$(echo "$KONFLUX_RNN" | rev | cut -d'/' -f2 | rev)
-KONFLUX_REGISTRY=$(echo "$KONFLUX_RNN" | rev | cut -d'/' -f3- | rev)
+TAG=$(echo "$KONFLUX_IMAGE" | cut -d':' -f2)
+RNN=$(echo "$KONFLUX_IMAGE" | cut -d':' -f1)
+NAME=$(echo "$RNN" | rev | cut -d'/' -f1 | rev)
+NAMESPACE=$(echo "$RNN" | rev | cut -d'/' -f2 | rev)
+REGISTRY=$(echo "$RNN" | rev | cut -d'/' -f3- | rev)
 
 DOCKERFILE_ADDITIONS=$(cat <<EOF
 RUN make build 
 EOF
 )
-ORG=openshift
-REPO=multiarch-tuning-operator
-COMMIT=main
-BUILD_ROOT=quay-proxy.ci.openshift.org/openshift/ci:ocp_builder_rhel-9-golang-1.23-openshift-4.19
 
 DOCKERFILE_LITERAL=$(cat <<EOF
-FROM ${BUILD_ROOT}
-COPY --from=quay-proxy.ci.openshift.org/openshift/ci:ocp_4.18_cli /bin/oc /bin/oc
-COPY --from=quay-proxy.ci.openshift.org/openshift/ci:ocp_4.18_cli /bin/kubectl /bin/kubectl
+FROM ${ARTIFACTS_BUILD_ROOT}
 RUN umask 0002
 WORKDIR /workspace
 RUN curl -L -o repo.zip "https://github.com/${ORG}/${REPO}/archive/${COMMIT}.zip" && unzip repo.zip
@@ -34,77 +40,62 @@ EOF
 )
 export DOCKERFILE_LITERAL
 
-EXEC_TYPE=1
+if [[ -z "$VARIANT" ]]; then
+  CI_OPERATOR_CONFIG=$(curl -sSL https://raw.githubusercontent.com/openshift/release/master/ci-operator/config/${ORG}/${REPO}/"${ORG}-${REPO}-${TARGET_BRANCH}.yaml")
+else
+  CI_OPERATOR_CONFIG=$(curl -sSL https://raw.githubusercontent.com/openshift/release/master/ci-operator/config/${ORG}/${REPO}/"${ORG}-${REPO}-${TARGET_BRANCH}__${VARIANT}.yaml")
+fi
 
-
-CI_OPERATOR_CONFIG='
-base_images:
-  cli-operator-sdk:
-    name: cli-operator-sdk
-    namespace: ocp
-    tag: v1.37.0
-releases:
-  latest:
-    prerelease:
-      product: ocp
-      version_bounds:
-        lower: 4.17.0-0
-        upper: 4.18.0-0
-        stream: 4-stable
-      architecture: multi
-resources:
-  "*":
-    requests:
-      cpu: "1"
-      memory: 1Gi
-tests:
-  - as: konflux-test-bundle
-    cron: 0 0 1 1 0
-    steps:
-      cluster_profile: gcp
-      dependencies:
-        OO_BUNDLE: pipeline:konflux
-      env:
-        OCP_ARCH: arm64
-        OO_INSTALL_NAMESPACE: openshift-multiarch-tuning-operator
-      test:
-        - as: konflux-test
-          commands: "make e2e"
-          from: root
-          resources:
-            requests:
-              cpu: 100m
-      workflow: optional-operators-ci-operator-sdk-gcp
-'
-
+ # Modifying ci-op config
 echo "$CI_OPERATOR_CONFIG" > config.yaml
+yq -i 'del(.build_root.project_image)' config.yaml
+yq -i 'del(.build_root.from_repository)' config.yaml
+if [[ "$INCLUDE_IMAGES" == "0" ]]; then
+  yq -i 'del(.images)' config.yaml
+fi
+if [[ "$INCLUDE_OPERATOR" == "0" ]]; then
+  yq -i 'del(.operator)' config.yaml
+fi
 yq -i '(.build_root.project_image += {"dockerfile_literal": strenv(DOCKERFILE_LITERAL) })' config.yaml
-yq -i '(.build_root.project_image += {"dockerfile_literal": strenv(DOCKERFILE_LITERAL) })' config.yaml
-yq -i '(.external_images.konflux.registry = "'${KONFLUX_REGISTRY}'")' config.yaml
-yq -i '(.external_images.konflux.namespace = "'${KONFLUX_NAMESPACE}'")' config.yaml
-yq -i '(.external_images.konflux.name = "'${KONFLUX_NAME}'")' config.yaml
-yq -i '(.external_images.konflux.tag = "'${KONFLUX_TAG}'")' config.yaml
-yq -i '(.zz_generated_metadata.branch = "main")' config.yaml
-yq -i '(.zz_generated_metadata.org = "openshift")' config.yaml
-yq -i '(.zz_generated_metadata.repo = "konflux-tasks")' config.yaml
+yq -i '(.external_images."'${IMAGE_IN_CONFIG}'".registry = "'${REGISTRY}'")' config.yaml
+yq -i '(.external_images."'${IMAGE_IN_CONFIG}'".namespace = "'${NAMESPACE}'")' config.yaml
+yq -i '(.external_images."'${IMAGE_IN_CONFIG}'".name = "'${NAME}'")' config.yaml
+yq -i '(.external_images."'${IMAGE_IN_CONFIG}'".tag = "'${TAG}'")' config.yaml
 
-yq -o=json config.yaml > config.json
-curl -d @config.json https://config.ci.openshift.org/resolve > resolved.json
-GZIP_SPEC=$(gzip -c resolved.json | base64 -w0)
-SPEC_FILE=$(mktemp)
-cat <<EOF > "$SPEC_FILE"
-{
-  "job_name": "${PROWJOB_NAME}",
-  "job_execution_type": "${EXEC_TYPE}",
-  "pod_spec_options": {
-    "envs": {
-      "CONFIG_SPEC": "${GZIP_SPEC}",
-    },
-    "annotations": {
-      "creator": "konflux"
-    }
-  }
-}
-EOF
+ # env var modifications
+if [[ -n "$ENVS" ]]; then
+  IFS=',' read -ra PAIRS <<< "$ENVS"
+  for pair in "${PAIRS[@]}"; do
+    KEY=$(echo "$pair" | cut -d'=' -f1)
+    VALUE=$(echo "$pair" | cut -d'=' -f2-)
+    yq -i '.tests[].steps.env."'"${KEY}"'" = "'"${VALUE}"'"' config.yaml
+  done
+fi
 
-echo "SPEC_FILE: $(cat $SPEC_FILE)"
+
+yq -o=json config.yaml | jq -Rs . > config.json
+payload=$(jq -n --arg job "$PROWJOB_NAME" --arg org "$ORG" --arg repo "$REPO" \
+  --argjson config "$(cat config.json)" \
+  '{
+      "job_name": $job,
+      "job_execution_type": "1",
+      "pod_spec_options": {
+        "annotations": {
+          "ci.openshift.io/konflux-repo" : ($org + "/" + $repo),
+        },
+        "envs": {
+          "UNRESOLVED_CONFIG": $config
+        },
+        }
+    }')
+
+if [[ "$DRY_RUN" -eq 1 ]]; then
+  echo "DRY RUN - not submitting the job"
+  echo "$payload"
+  exit 0
+fi
+NAMESPACE="konflux-tp"
+SECRET_NAME="api-token-secret-2025-04"
+# Extract token from the secret
+TOKEN=$(oc --context app.ci -n "$NAMESPACE" extract "secret/$SECRET_NAME" --to=- --keys=token)
+curl -v -d "$payload" -H "Authorization: Bearer $TOKEN" https://gangway-ci.apps.ci.l2s4.p1.openshiftapps.com/v1/executions
