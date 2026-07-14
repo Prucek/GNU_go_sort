@@ -1,3 +1,4 @@
+# ci-operator configuration for in-repo CI
 build_root:
   image_stream_tag:
     name: release
