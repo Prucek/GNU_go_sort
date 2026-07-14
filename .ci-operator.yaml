@@ -14,7 +14,7 @@ tests:
   container:
     from: src
 - as: dummy
-  commands: echo test
+  commands: echo "in-repo config works!"
   container:
     from: src
 zz_generated_metadata:
