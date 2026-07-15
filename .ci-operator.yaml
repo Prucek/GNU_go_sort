@@ -14,7 +14,12 @@ tests:
   container:
     from: src
 - as: dummy
-  commands: echo test
+  commands: echo "in-repo config works!"
+  container:
+    from: src
+- as: nightly-check
+  cron: '0 4 * * *'
+  commands: echo "nightly check passed"
   container:
     from: src
 zz_generated_metadata:
